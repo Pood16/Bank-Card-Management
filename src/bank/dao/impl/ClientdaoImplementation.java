@@ -1,89 +1,141 @@
 package bank.dao.impl;
 
-import bank.config.DatabaseConfig;
+import bank.config.DatabaseConnection;
 import bank.dao.ClientDAO;
 import bank.exception.DaoException;
 import bank.model.Client;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class ClientdaoImplementation implements ClientDAO {
 
-    private DatabaseConfig dbconfig;
+    private DatabaseConnection dbconfig;
 
-    public ClientdaoImplementation(DatabaseConfig dbconfig) {
-        this.dbconfig = dbconfig;
+    public ClientdaoImplementation() {
+            this.dbconfig = DatabaseConnection.getInstance();
     }
 
-
     @Override
-    public Client save(String client_id, String name, String email, String phone) throws DaoException{
-        String sql = "INSERT INTO client (client_id, name, email, phone) VALUES (?, ?, ?, ?)";
+    public Client save(Client client) throws DaoException{
+        String sql = "INSERT INTO clients (id, name, email, phone) VALUES (?, ?, ?, ?)";
         try(Connection connection = dbconfig.getConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ){
-            preparedStatement.setString(1, client_id);
-            preparedStatement.setString(2, name);
-            preparedStatement.setString(3, email);
-            preparedStatement.setString(4, phone);
+            preparedStatement.setString(1, client.id());
+            preparedStatement.setString(2, client.name());
+            preparedStatement.setString(3, client.email());
+            preparedStatement.setString(4, client.phone());
 
             preparedStatement.executeUpdate();
-
-            return new Client(client_id, name, email, phone);
+            return client;
 
         }catch (SQLException e) {
-            throw new DaoException("Failed to insert the client due to: " + e.getMessage());
+            throw new DaoException(e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean update(Client client) throws DaoException {
+        String sql = "UPDATE clients SET name = ?, email = ?, phone = ? WHERE id = ?";
+        try(Connection connection = dbconfig.getConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ){
+            preparedStatement.setString(1, client.name());
+            preparedStatement.setString(2, client.email());
+            preparedStatement.setString(3, client.phone());
+            preparedStatement.setString(4, client.id());
+
+            int count = preparedStatement.executeUpdate();
+            return count == 1;
+        }catch(SQLException e){
+            throw new DaoException("Failed to update the client: " + e.getMessage());
         }
     }
 
     @Override
     public boolean delete(String client_id) throws DaoException {
-        String sql = "DELETE FROM client WHERE client_id = ?";
+        String sql = "DELETE FROM clients WHERE id = ?";
         try(Connection connection = dbconfig.getConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ){
             preparedStatement.setString(1, client_id);
-            preparedStatement.executeUpdate();
-            return true;
+            int count = preparedStatement.executeUpdate();
+            return count == 1;
         }catch(SQLException e){
-            throw new DaoException("Failed to delete the client. " + e.getMessage());
+            throw new DaoException("Failed to delete the client");
         }
     }
 
     @Override
     public Optional<Client> findById(String id) throws DaoException {
-        String sql = "SELECT * FROM client WHERE client_id = ?";
+        String sql = "SELECT * FROM clients WHERE id = ?";
         try(Connection connection = dbconfig.getConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ){
             return getClient(id, preparedStatement);
         }catch(SQLException e) {
-            throw new DaoException("Failed to retrieve the client information. " + getClass());
+            throw new DaoException("Failed to retrieve the client information.");
         }
     }
 
     @Override
     public Optional<Client> findByName(String name) throws DaoException {
-        String sql = "SELECT * FROM client WHERE name = ?";
+        String sql = "SELECT * FROM clients WHERE name = ?";
         try(Connection connection = dbconfig.getConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ){
             return getClient(name, preparedStatement);
         }catch(SQLException e) {
-            throw new DaoException("Failed to retrieve client. " + e.getMessage());
+            throw new DaoException("Failed to retrieve client information.");
         }
     }
 
     @Override
     public Optional<Client> findByEmail(String email) throws DaoException {
-        String sql = "SELECT * FROM client WHERE email = ?";
+        String sql = "SELECT * FROM clients WHERE email = ?";
         try(Connection connection = dbconfig.getConnection();
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ){
             return getClient(email, preparedStatement);
         }catch(SQLException e) {
-            throw new DaoException("Failed to retrieve the client information" + e.getMessage());
+            throw new DaoException("Failed to retrieve client information.");
+        }
+    }
+
+    @Override
+    public Optional<Client> findByPhone(String phone) throws DaoException {
+        String sql = "SELECT * FROM clients WHERE phone = ?";
+        try(Connection connection = dbconfig.getConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ){
+            return getClient(phone, preparedStatement);
+        }catch(SQLException e) {
+            throw new DaoException("Failed to retrieve client information.");
+        }
+    }
+
+    @Override
+    public List<Client> findAll() throws DaoException {
+        List<Client> clients = new ArrayList<>();
+        try(Connection connection = dbconfig.getConnection()) {
+            String sql = "SELECT * FROM clients";
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            ResultSet results = preparedStatement.executeQuery();
+            while(results.next()) {
+                Client client = new Client(
+                        results.getString("id"),
+                        results.getString("name"),
+                        results.getString("email"),
+                        results.getString("phone")
+                );
+                clients.add(client);
+            }
+            return clients;
+        }catch(SQLException e) {
+            throw new DaoException("Failed to retrieve clients list.");
         }
     }
 
@@ -91,7 +143,7 @@ public class ClientdaoImplementation implements ClientDAO {
         preparedStatement.setString(1, key);
         ResultSet result = preparedStatement.executeQuery();
         if (result.next()) {
-            Client client = new Client(result.getString("client_id"),result.getString("name"), result.getString("email"), result.getString("phone"));
+            Client client = new Client(result.getString("id"),result.getString("name"), result.getString("email"), result.getString("phone"));
             return Optional.of(client);
         } else {
             return Optional.empty();
